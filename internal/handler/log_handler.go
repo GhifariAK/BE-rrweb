@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // Simpan data dari Vue ke Postgres
@@ -19,6 +21,12 @@ func SaveLog(c *gin.Context) {
 
 	var input map[string]interface{}
 	if err := c.ShouldBindJSON(&input); err != nil {
+		// CONTOH LOG ERROR LENGKAP
+		slog.Error("Gagal membaca input JSON dari frontend",
+			slog.String("error", err.Error()),
+			slog.String("trace_id", trace.SpanFromContext(ctx).SpanContext().TraceID().String()),
+		)
+
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

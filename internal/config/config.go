@@ -2,7 +2,7 @@ package config
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 
 	"demo-rrweb/internal/model"
@@ -17,6 +17,12 @@ import (
 // DB adalah variabel global untuk dipakai oleh handler nanti
 var DB *gorm.DB
 
+// Mode json untuk Log di terminal
+func InitLogger() {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(logger) // Jadikan default untuk seluruh aplikasi
+}
+
 // GetEnv adalah helper untuk mengambil nilai dari .env dengan nilai cadangan (fallback)
 func GetEnv(key, fallback string) string {
 	if value, exists := os.LookupEnv(key); exists {
@@ -28,7 +34,7 @@ func GetEnv(key, fallback string) string {
 func ConnectDatabase() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Println("Peringatan: File .env tidak ditemukan")
+		slog.Warn("Peringatan: File .env tidak ditemukan")
 	}
 
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
@@ -38,17 +44,17 @@ func ConnectDatabase() {
 
 	database, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		log.Fatal("Gagal terhubung ke database PostgreSQL: ", err)
+		slog.Error("Gagal terhubung ke database PostgreSQL: ", slog.String("error", err.Error()))
 	}
 
 	// Pasang pengawas di semua query database
 	if err := database.Use(tracing.NewPlugin()); err != nil {
-		log.Fatal("Gagal memasang sensor OTel GORM:", err)
+		slog.Error("Gagal memasang sensor OTel GORM:", slog.String("error", err.Error()))
 	}
 
 	// Otomatis membuat/update tabel dari struct SessionLog
 	database.AutoMigrate(&model.SessionLog{})
 
 	DB = database
-	fmt.Println("Database PostgreSQL berhasil terhubung dan termigrasi!")
+	slog.Info("Database PostgreSQL berhasil terhubung dan termigrasi!")
 }

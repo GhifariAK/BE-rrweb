@@ -29,6 +29,8 @@ func CORSMiddleware() gin.HandlerFunc {
 }
 
 func main() {
+	config.InitLogger()
+
 	// 1. Inisialisasi Database
 	config.ConnectDatabase()
 
