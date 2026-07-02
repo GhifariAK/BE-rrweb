@@ -1,13 +1,17 @@
 package main
 
 import (
+	"context"
+	"log"
 	"net/http"
-	"os"
 
 	"demo-rrweb/internal/config"
 	"demo-rrweb/internal/handler"
+	"demo-rrweb/internal/telemetry"
 
 	"github.com/gin-gonic/gin"
+
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin" //middlewaree khusus Gin dari Otel
 )
 
 func CORSMiddleware() gin.HandlerFunc {
@@ -28,20 +32,28 @@ func main() {
 	// 1. Inisialisasi Database
 	config.ConnectDatabase()
 
-	// 2. Setup Gin Router
+	// 2. Init Opentelemetry
+	tp, err := telemetry.InitTracer()
+	if err != nil {
+		log.Fatal("Gagal menyalakan OTel:", err)
+	}
+	// Perintah defer memastikan mesin OTel dimatikan dengan rapi saat server Golang ditutup (Ctrl+C)
+	defer tp.Shutdown(context.Background())
+
+	// 3. Setup Gin Router
 	r := gin.Default()
 	r.Use(CORSMiddleware())
 
-	// 3. Daftarkan Endpoint (Sangat rapi karena memanggil dari folder handler)
+	// 4. Daftarkan Middleware Otel untuk Gin
+	r.Use(otelgin.Middleware("rrweb-backend"))
+
+	// 5. Daftarkan Endpoint (Sangat rapi karena memanggil dari folder handler)
 	r.POST("/api/logs", handler.SaveLog)
 	r.GET("/api/sessions", handler.GetSessionsList)    // API untuk list tabel Admin
 	r.GET("/api/sessions/:id", handler.GetSessionByID) // API untuk player video
 	r.DELETE("/api/sessions/:id", handler.DeleteSession)
 
 	// 4. Jalankan Server
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
+	port := config.GetEnv("PORT", "8080")
 	r.Run(":" + port)
 }

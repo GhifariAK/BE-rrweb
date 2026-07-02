@@ -9,15 +9,23 @@ import (
 	"demo-rrweb/internal/model"
 
 	"github.com/gin-gonic/gin"
+	"go.opentelemetry.io/otel"
 )
 
 // Simpan data dari Vue ke Postgres
 func SaveLog(c *gin.Context) {
+	// Ambil context dari request untuk tracing
+	ctx := c.Request.Context()
+
 	var input map[string]interface{}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	// ngitung kecepatan konversi JSON
+	tracer := otel.Tracer("rrweb-handler")
+	spanCtx, span := tracer.Start(ctx, "Proses Format JSON")
 
 	// Ubah array object menjadi string mentah untuk masuk ke kolom JSONB
 	eventsRaw, _ := json.Marshal(input["events"])
@@ -27,7 +35,9 @@ func SaveLog(c *gin.Context) {
 		CreatedAt: time.Now(),
 	}
 
-	if err := config.DB.Create(&logBaru).Error; err != nil {
+	span.End() // Akhiri span untuk proses konversi JSON
+
+	if err := config.DB.WithContext(spanCtx).Create(&logBaru).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal simpan ke database"})
 		return
 	}
@@ -37,6 +47,8 @@ func SaveLog(c *gin.Context) {
 
 // Mengambil Daftar Sesi (Hanya ID dan Waktu untuk Tabel Admin)
 func GetSessionsList(c *gin.Context) {
+	ctx := c.Request.Context()
+
 	// Kita buat struct kecil sementara agar database tidak perlu
 	// menarik data JSON (events) yang ukurannya bisa ber-megabyte
 	type SessionSummary struct {
@@ -47,7 +59,7 @@ func GetSessionsList(c *gin.Context) {
 	var summaries []SessionSummary
 
 	// Select membatasi kolom yang ditarik, membuat query super cepat
-	if err := config.DB.Model(&model.SessionLog{}).Select("id", "created_at").Order("created_at desc").Find(&summaries).Error; err != nil {
+	if err := config.DB.WithContext(ctx).Model(&model.SessionLog{}).Select("id", "created_at").Order("created_at desc").Find(&summaries).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengambil data"})
 		return
 	}
@@ -57,10 +69,11 @@ func GetSessionsList(c *gin.Context) {
 
 // Mengambil Data JSON Spesifik berdasarkan ID (Untuk Replayer)
 func GetSessionByID(c *gin.Context) {
+	ctx := c.Request.Context()
 	id := c.Param("id") // Mengambil ID dari URL (/api/sessions/1)
 	var session model.SessionLog
 
-	if err := config.DB.First(&session, id).Error; err != nil {
+	if err := config.DB.WithContext(ctx).First(&session, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Sesi tidak ditemukan"})
 		return
 	}
@@ -74,10 +87,11 @@ func GetSessionByID(c *gin.Context) {
 
 // Menghapus Sesi dari Database berdasarkan ID
 func DeleteSession(c *gin.Context) {
+	ctx := c.Request.Context()
 	id := c.Param("id") // Tangkap ID dari URL
 
 	// Perintah GORM untuk menghapus baris di PostgreSQL berdasarkan ID
-	if err := config.DB.Delete(&model.SessionLog{}, id).Error; err != nil {
+	if err := config.DB.WithContext(ctx).Delete(&model.SessionLog{}, id).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menghapus data dari database"})
 		return
 	}
