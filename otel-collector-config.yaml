@@ -1,0 +1,40 @@
+# Otel COllector sebagai broker untuk menerima data
+# Trace dan Log dari Golang, lalu diteruskan ke Tempo dan Loki
+
+# Receivers bertugas sebagai endpoint untuk menerima data dari Golang (OTLP gRPC)
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+
+# Processor bertugas memproses data sbeelum dikirim
+# Batch berarti data tidak dikirimkan 1 1
+processors:
+  batch:
+
+# Exporters bertugas mengirim data ke Tempo dan Loki
+exporters:
+  # Kirim data Trace ke Tempo (menggunakan OTLP gRPC)
+  otlp/tempo:
+    endpoint: tempo:4317 # "tempo" diambil dari nama container di docker compose
+    tls:
+      insecure: true
+
+  # Kirim data Log ke Loki (menggunakan OTLP HTTP)
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
+    tls:
+      insecure: true
+
+# Service mengatur sia menerima apa, dikemas oleh siapa, dan dikirim kemana
+service:
+  pipelines:
+    traces: #Jalur khusus trace
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp/tempo]
+    logs: # Jalur khusus log
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp/loki]

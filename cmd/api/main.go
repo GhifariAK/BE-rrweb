@@ -29,33 +29,38 @@ func CORSMiddleware() gin.HandlerFunc {
 }
 
 func main() {
-	config.InitLogger()
-
-	// 1. Inisialisasi Database
-	config.ConnectDatabase()
-
-	// 2. Init Opentelemetry
-	tp, err := telemetry.InitTracer()
+	// 1. Init Opentelemetry
+	tel, err := telemetry.InitTelemetry()
 	if err != nil {
 		log.Fatal("Gagal menyalakan OTel:", err)
 	}
-	// Perintah defer memastikan mesin OTel dimatikan dengan rapi saat server Golang ditutup (Ctrl+C)
-	defer tp.Shutdown(context.Background())
 
-	// 3. Setup Gin Router
+	defer func() {
+		ctx := context.Background()
+		tel.Trace(ctx)
+		tel.Log(ctx)
+	}()
+
+	// 2. Init Logger
+	config.InitLogger()
+
+	// 3. Init Database
+	config.ConnectDatabase()
+
+	// 4. Setup Gin Router
 	r := gin.Default()
 	r.Use(CORSMiddleware())
 
-	// 4. Daftarkan Middleware Otel untuk Gin
+	// 5. Daftarkan Middleware Otel untuk Gin
 	r.Use(otelgin.Middleware("rrweb-backend"))
 
-	// 5. Daftarkan Endpoint (Sangat rapi karena memanggil dari folder handler)
+	// 6. Daftarkan Endpoint (Sangat rapi karena memanggil dari folder handler)
 	r.POST("/api/logs", handler.SaveLog)
 	r.GET("/api/sessions", handler.GetSessionsList)    // API untuk list tabel Admin
 	r.GET("/api/sessions/:id", handler.GetSessionByID) // API untuk player video
 	r.DELETE("/api/sessions/:id", handler.DeleteSession)
 
-	// 4. Jalankan Server
+	// 7. Jalankan Server
 	port := config.GetEnv("PORT", "8080")
 	r.Run(":" + port)
 }

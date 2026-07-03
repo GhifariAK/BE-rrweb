@@ -50,6 +50,11 @@ func SaveLog(c *gin.Context) {
 		return
 	}
 
+	// Tambahan Log sukses untuk melihat hasil di grafana
+	slog.Info("Data rekaman berhasil disimpan ke database",
+		slog.String("trace_id", trace.SpanFromContext(ctx).SpanContext().TraceID().String()),
+	)
+
 	c.JSON(http.StatusOK, gin.H{"message": "Data berhasil disimpan!"})
 }
 

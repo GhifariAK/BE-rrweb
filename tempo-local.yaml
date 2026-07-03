@@ -1,6 +1,11 @@
+#  Mengatur cara kerja internal Grafana
+#  Tempo dalam meneirma dan menyimpan data Trace
+
+# Port tempat grafanaUI mengambil data untuk ditampilkan
 server:
   http_listen_port: 3200
 
+# Pintu masuk internal Tempo
 distributor:
   receivers:
     otlp:
@@ -8,8 +13,16 @@ distributor:
         grpc:
           endpoint: 0.0.0.0:4317
 
+# Pengaturan penyimpanan data Trace
+# Simpan data secara local didalam hardisk container
+# dan penetapan lokasi penyipanan smentaranya
 storage:
   trace:
     backend: local
     local:
       path: /tmp/tempo/blocks
+
+# Pengaturan pembersihan data (di set 5 menit untuk testing)
+compactor:
+  compaction:
+    block_retention: 5m

@@ -12,6 +12,8 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/plugin/opentelemetry/tracing"
+
+	"go.opentelemetry.io/contrib/bridges/otelslog"
 )
 
 // DB adalah variabel global untuk dipakai oleh handler nanti
@@ -19,7 +21,7 @@ var DB *gorm.DB
 
 // Mode json untuk Log di terminal
 func InitLogger() {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	logger := otelslog.NewLogger("rrweb-golang-api")
 	slog.SetDefault(logger) // Jadikan default untuk seluruh aplikasi
 }
 
